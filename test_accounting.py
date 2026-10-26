@@ -95,6 +95,32 @@ class MathTests(unittest.TestCase):
         remaining-=self.scale(3,gib)
         self.assertEqual(remaining,0)
 
+    def test_cumulative_factor_changes_never_reprice_previous_traffic(self):
+        name='user>>>'+scoped(1,'shared@example.com')+'>>>traffic>>>downlink'
+        self.store.set_factor(1,'1.5')
+        self.assertEqual(self.scale(1,100,False),150)
+        self.store.set_factor(1,'2',[(name,100)])
+        self.assertEqual(self.scale(1,100,False),150)
+        self.assertEqual(self.scale(1,150,False),250)
+        self.store.set_factor(1,'.5',[(name,150)])
+        self.assertEqual(self.scale(1,150,False),250)
+        self.assertEqual(self.scale(1,200,False),275)
+
+    def test_cumulative_boundary_does_not_cross_core_generations(self):
+        name='user>>>'+scoped(1,'shared@example.com')+'>>>traffic>>>downlink'
+        self.store.set_factor(1,2)
+        self.store.set_factor(1,.5,[(name,100)])
+        self.assertEqual(self.scale(1,100,False),200)
+        self.store.generation='a-new-core-process'
+        self.assertEqual(self.scale(1,1000,False),500)
+
+    def test_reset_collection_clears_coefficient_boundary(self):
+        name='user>>>'+scoped(1,'shared@example.com')+'>>>traffic>>>downlink'
+        self.store.set_factor(1,2)
+        self.store.set_factor(1,.5,[(name,100)])
+        self.assertEqual(self.scale(1,150,True),225)
+        self.assertEqual(self.scale(1,100,True),50)
+
 
 def wait_port(port):
     for _ in range(100):
@@ -155,7 +181,7 @@ class CoreIntegrationTests(unittest.TestCase):
                 grpc.channel_ready_future(channel).result(timeout=5)
                 store = Store(str(root/'state.sqlite'))
                 store.sync([dict(id=i,tag='private'+str(i),remark='private',port=62683+i,protocol='vless') for i in [1,2]])
-                gateway = Gateway(channel, store)
+                gateway = Gateway(channel, store,generation_provider=lambda:str(process.pid))
                 gateway_server = make_server(gateway,'127.0.0.1:62690');gateway_server.start()
                 client = grpc.insecure_channel('127.0.0.1:62690')
                 # Exercise the exact narrow Linux redirect and marked bypass.
@@ -234,6 +260,15 @@ class CoreIntegrationTests(unittest.TestCase):
                 with self.assertRaises(Exception):stream(62684)
                 # Removing authentication does not tear down an established data socket.
                 c.sendall(b'active');self.assertEqual(exact(c,6),b'active')
+                before_change={r.name:r.value for r in snapshot(False).stat if r.name.startswith('user>>>')}
+                gateway.change_factor(1,3)
+                after_change={r.name:r.value for r in snapshot(False).stat if r.name.startswith('user>>>')}
+                self.assertEqual(before_change,after_change,'Changing coefficient repriced historical cumulative traffic')
+                down='user>>>'+email+'>>>traffic>>>downlink'
+                c.sendall(b'x'*128);self.assertEqual(exact(c,128),b'x'*128)
+                time.sleep(.1)
+                later={r.name:r.value for r in snapshot(False).stat if r.name.startswith('user>>>')}
+                self.assertEqual(later[down]-after_change[down],3*128)
                 # A normal upstream/core update reloads original panel settings.
                 # Verify the independent gateway re-applies saved factors after
                 # that private core restarts, without patching its saved config.
@@ -284,7 +319,7 @@ class WebAuthTests(unittest.TestCase):
             app=web.Application(config)
             rows=[dict(id=i,tag='test'+str(i),remark='test',port=10000+i,protocol='vless') for i in [1,2]]
             app.store.sync(rows)
-            app.gateway=types.SimpleNamespace(last_rpc_at=0,last_error='',handler_lock=threading.RLock())
+            app.gateway=types.SimpleNamespace(last_rpc_at=0,last_error='',handler_lock=threading.RLock(),change_factor=app.store.set_factor)
             app.metadata_ok_at=int(time.time())
             def inbounds(cookie=None):
                 if cookie!='3x-ui=private-session':raise PermissionError('login required')

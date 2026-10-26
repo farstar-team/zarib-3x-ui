@@ -19,6 +19,8 @@ Legacy open connections cannot be attributed to an inbound after the fact becaus
 
 Integer milli-factors and persisted fractional byte carry avoid repeated rounding loss. Preview reads never commit carry; reset reads do. Filtered reset queries drain only matching counters. The native panel performs its ordinary shared-quota accounting; no custom triggers or billing columns are added to its database.
 
+Current 3x-ui uses non-resetting cumulative counters and computes deltas itself. On each factor change, the gateway snapshots the selected inbound's raw counters and atomically stores integer milli-byte offsets. The weighted cumulative value remains continuous at that boundary, so changing a factor never retroactively reprices earlier traffic. Offsets are bound to the configured core's host boot ID, PID and process start time. A new core generation, or an observed physical counter reset, invalidates the old boundary. Reset-based collectors consume the boundary once and clear it. This state is separate from quota/usage records in the official panel.
+
 SQLite metadata is opened `mode=ro` with `query_only`. Local PostgreSQL gets a random, non-superuser reader role with SELECT only on `inbounds(id,tag,remark,port,protocol)`. No permanent panel-admin token is retained. Browser writes require a valid panel session, authorized inbound, exact Origin and JSON media type.
 
 ## Installation and upgrade

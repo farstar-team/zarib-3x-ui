@@ -98,10 +98,11 @@ def main():
                               {'listen':'127.0.0.1','port':62584,'protocol':'vless','tag':'smoke-inbound','settings':{'decryption':'none','clients':[{'id':identity,'email':email}]}}],
                   'outbounds':[{'protocol':'freedom','settings':{'finalRules':[{'action':'allow','network':'tcp','ip':['127.0.0.1/32'],'port':'62587'}]}}],
                   'routing':{'rules':[{'type':'field','inboundTag':['api'],'outboundTag':'api'}]}}
-            core_file=fixture/'core.json';core_file.write_text(json.dumps(core))
+            (fixture/'bin').mkdir()
+            core_file=fixture/'bin/config.json';core_file.write_text(json.dumps(core))
             binary=os.environ.get('XRAY_BIN','/usr/local/x-ui/bin/xray-linux-amd64')
             with open(fixture/'core.log','w') as log:
-                process=subprocess.Popen([binary,'run','-c',str(core_file)],stdout=log,stderr=log)
+                process=subprocess.Popen([binary,'run','-c','bin/config.json'],cwd=fixture,stdout=log,stderr=log)
             for _ in range(60):
                 try:
                     with socket.create_connection(('127.0.0.1',62584),timeout=.2):break

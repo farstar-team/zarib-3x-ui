@@ -1,5 +1,6 @@
 """Authenticated companion UI and lifecycle, separate from upstream 3x-ui files."""
 import collections
+import hashlib
 import http.client
 import http.server
 import json
@@ -39,6 +40,55 @@ def origin(config):
     host=config['hostname']
     if ':' in host and not host.startswith('['):host='['+host+']'
     return config.get('web_scheme','https')+'://'+host+':'+str(config['web_port'])
+
+
+class CoreGeneration:
+    """Identify the configured core process without changing or restarting it."""
+    def __init__(self,config_path,pid_hint=None,parent_hint=None,parent_command=None):
+        self.path=pathlib.Path(config_path).resolve()
+        self.boot=pathlib.Path('/proc/sys/kernel/random/boot_id').read_text().strip()
+        self.cached=pathlib.Path('/proc')/str(pid_hint) if pid_hint else None
+        self.parent_hint=str(parent_hint) if parent_hint else None
+        self.parent_command=parent_command
+
+    def identity(self,proc):
+        fields=(proc/'stat').read_text().rsplit(')',1)[1].split()
+        if fields[0]=='Z':return None
+        return self.boot+':'+proc.name+':'+fields[19]
+
+    def __call__(self):
+        if self.cached:
+            try:
+                identity=self.identity(self.cached)
+                if identity:return identity
+            except OSError:pass
+        for proc in pathlib.Path('/proc').iterdir():
+            if not proc.name.isdigit():continue
+            try:
+                if not (proc/'comm').read_text().startswith('xray'):continue
+                arguments=(proc/'cmdline').read_bytes().decode().split('\0')
+                for index,argument in enumerate(arguments[:-1]):
+                    if argument not in ['-c','-config']:continue
+                    candidate=pathlib.Path(arguments[index+1])
+                    if not candidate.is_absolute():
+                        try:candidate=(proc/'cwd').resolve(strict=True)/candidate
+                        except PermissionError:
+                            # A root service with a restricted capability set
+                            # cannot always dereference another root process's
+                            # cwd. Match the explicit relative suffix used by
+                            # native 3x-ui without granting ptrace privileges.
+                            if len(candidate.parts)<2 or not self.path.as_posix().endswith('/'+candidate.as_posix()):continue
+                            fields=(proc/'stat').read_text().rsplit(')',1)[1].split()
+                            parent=fields[1]
+                            if self.parent_hint and parent!=self.parent_hint:
+                                command=(pathlib.Path('/proc')/parent/'cmdline').read_bytes()
+                                if not self.parent_command or hashlib.sha256(command).hexdigest()!=self.parent_command:continue
+                            candidate=self.path
+                    if candidate.resolve()==self.path:
+                        identity=self.identity(proc)
+                        if identity:self.cached=proc;return identity
+            except (OSError,UnicodeError,IndexError):continue
+        raise RuntimeError('Configured Xray core is temporarily unavailable')
 
 
 class Panel:
@@ -195,8 +245,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             if self.app.error or time.time()-self.app.metadata_ok_at>90:
                 return self.respond(503,{'error':'همگام‌سازی پنل نیاز به بررسی دارد؛ ضریب تغییر نکرد'})
             self.app.safety_check()
-            with self.app.gateway.handler_lock:
-                self.app.store.set_factor(inbound_id,body['factor'])
+            self.app.gateway.change_factor(inbound_id,body['factor'])
             # Reconciliation is asynchronous so a UI timeout never repeats a user edit.
             self.respond(200,{'success':True,'message':'ضریب ذخیره شد؛ تا ۵ ثانیه دیگر برای اتصال‌های تازه اعمال می‌شود'})
         except PermissionError as error:self.respond(401,{'error':str(error)})
@@ -247,7 +296,8 @@ def main():
     relay=MarkedRelay(('127.0.0.1',config['relay_port']),('127.0.0.1',config['core_api_port']))
     relay.start()
     channel=grpc.insecure_channel('127.0.0.1:'+str(config['relay_port']))
-    app.gateway=Gateway(channel,app.store,app.refresh)
+    app.gateway=Gateway(channel,app.store,app.refresh,CoreGeneration(config['core_config'],
+        config.get('core_pid_hint'),config.get('core_parent_pid_hint'),config.get('core_parent_command_hash')))
     # Only a read without resetting counters is used for readiness.
     app.gateway.call(STAT+'GetSysStats',stats.SysStatsRequest(),timeout=8)
     grpc_server=make_server(app.gateway,'127.0.0.1:'+str(config['gateway_port']))

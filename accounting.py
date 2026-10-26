@@ -82,8 +82,12 @@ class Store:
             CREATE TABLE IF NOT EXISTS changes (
                 id INTEGER PRIMARY KEY, inbound_id INTEGER, old_milli INTEGER,
                 new_milli INTEGER, changed_at INTEGER);
+            CREATE TABLE IF NOT EXISTS counter_offsets (
+                name TEXT PRIMARY KEY, generation TEXT NOT NULL,
+                raw_boundary INTEGER NOT NULL, offset_milli INTEGER NOT NULL);
         """)
         self.db.commit()
+        self.generation='unbound'
 
     def sync(self, inbounds):
         with self.lock, self.db:
@@ -102,7 +106,7 @@ class Store:
     def row_for_tag(self, tag):
         return next((r for r in self.rows() if r["tag"] == tag and r['active']), None)
 
-    def set_factor(self, inbound_id, value):
+    def set_factor(self, inbound_id, value, samples=None):
         number = decimal.Decimal(str(value))
         if not number.is_finite() or not 0 <= number <= 10 or number * 1000 != int(number * 1000):
             raise ValueError("ضریب باید عددی بین صفر و ۱۰ و حداکثر سه رقم اعشار باشد")
@@ -113,6 +117,17 @@ class Store:
                 raise ValueError("اینباند پیدا نشد")
             if row[0] != "vless":
                 raise ValueError("این افزونه فعلاً اینباندهای VLESS را پشتیبانی می‌کند")
+            if milli!=row[1] and samples is not None:
+                for name,raw in samples:
+                    parts=name.split('>>>')
+                    identity=unscoped(parts[1]) if len(parts)==4 and parts[0]=='user' and parts[2]=='traffic' else None
+                    if not identity or identity[0]!=int(inbound_id):continue
+                    previous=self.db.execute('SELECT generation,raw_boundary,offset_milli FROM counter_offsets WHERE name=?',(name,)).fetchone()
+                    offset=previous[2] if previous and previous[0]==self.generation and raw>=previous[1] else 0
+                    offset+=(row[1]-milli)*raw
+                    self.db.execute('INSERT INTO counter_offsets(name,generation,raw_boundary,offset_milli) VALUES(?,?,?,?) '
+                        'ON CONFLICT(name) DO UPDATE SET generation=excluded.generation,raw_boundary=excluded.raw_boundary,offset_milli=excluded.offset_milli',
+                        (name,self.generation,raw,offset))
             self.db.execute("UPDATE inbounds SET milli=?,instrumented=?,updated_at=? WHERE id=?",
                             (milli, int(row[2] or milli != 1000), int(time.time()), int(inbound_id)))
             self.db.execute("INSERT INTO changes(inbound_id,old_milli,new_milli,changed_at) VALUES(?,?,?,?)",
@@ -129,10 +144,16 @@ class Store:
         milli = row[0] if row else 1000
         previous = self.db.execute("SELECT remainder FROM fractions WHERE name=?", (name,)).fetchone()
         remainder = previous[0] if previous else 0
-        billed, remainder_next = divmod(value * milli + remainder, 1000)
+        boundary=self.db.execute('SELECT generation,raw_boundary,offset_milli FROM counter_offsets WHERE name=?',(name,)).fetchone()
+        offset=0
+        if boundary:
+            if boundary[0]==self.generation and value>=boundary[1]:offset=boundary[2]
+            else:self.db.execute('DELETE FROM counter_offsets WHERE name=?',(name,))
+        billed, remainder_next = divmod(value * milli + offset + remainder, 1000)
         if billed > (1 << 63) - 1:
             raise OverflowError("Billed traffic exceeds int64")
         if reset:
+            self.db.execute('DELETE FROM counter_offsets WHERE name=?',(name,))
             self.db.execute("""INSERT INTO fractions(name,remainder,raw,billed) VALUES(?,?,?,?)
                 ON CONFLICT(name) DO UPDATE SET remainder=excluded.remainder,
                 raw=fractions.raw+excluded.raw,billed=fractions.billed+excluded.billed""",
@@ -141,11 +162,12 @@ class Store:
 
 
 class Gateway(grpc.GenericRpcHandler):
-    def __init__(self, channel, store, metadata_refresh=None):
+    def __init__(self, channel, store, metadata_refresh=None, generation_provider=None):
         self.channel = channel
         self.store = store
         self.handler_lock = threading.RLock()
         self.metadata_refresh = metadata_refresh
+        self.generation_provider=generation_provider
         self.last_error = ""
         self.last_rpc_at = 0
 
@@ -187,11 +209,20 @@ class Gateway(grpc.GenericRpcHandler):
     def dispatch(self, method, payload):
         if method.startswith(STAT):
             with self.store.lock, self.store.db:
+                if self.generation_provider:self.store.generation=self.generation_provider()
                 return self.stats_call(method[len(STAT):], payload)
         if method.startswith(HANDLER):
             with self.handler_lock:
                 return self.handler_call(method[len(HANDLER):], payload)
         return self.call(method, payload)
+
+    def change_factor(self,inbound_id,value):
+        # Keep the virtual cumulative counter continuous when a coefficient is
+        # edited. Current 3x-ui computes deltas from non-resetting counters.
+        with self.handler_lock,self.store.lock,self.store.db:
+            if self.generation_provider:self.store.generation=self.generation_provider()
+            response=stats.QueryStatsResponse.FromString(self.call(STAT+'QueryStats',stats.QueryStatsRequest(reset=False)))
+            self.store.set_factor(inbound_id,value,[(item.name,item.value) for item in response.stat])
 
     def aliases(self, name):
         parts = name.split(">>>")

@@ -1,6 +1,6 @@
 'use strict';
 const $ = selector => document.querySelector(selector);
-const UI_VERSION = '1.1.0';
+const UI_VERSION = '1.1.1';
 const digits = value => new Intl.NumberFormat('fa-IR', {maximumFractionDigits: 3}).format(value);
 const drafts = new Map();
 let inboundRows = [];

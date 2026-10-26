@@ -20,6 +20,8 @@ Optional flags include `--host panel.example.com`, `--web-port 2087`, `--panel-d
 
 ## Accounting
 
+Version 1.1.1 preserves the cumulative counter's already weighted value when a factor is edited. Previously collected usage is never repriced at the new factor. Per-counter boundaries are persisted and tied to the configured core process generation; legacy reset-based collection is supported too.
+
 Each inbound has its own factor, while the panel keeps the account's shared quota. Downloading 2 GB on a 1.5× inbound deducts 3 GB; 2 GB on a 1× inbound deducts 2 GB; 1 GB on a 5× inbound deducts 5 GB. Both upload and download count. Physical inbound/server traffic remains unscaled.
 
 Fresh installations start every factor at 1. Factors range from 0 to 10 with up to three decimal places. Zero makes new traffic free; it does not reactivate an expired or disabled account. Historical usage, quota, expiration, UUID and flow remain unchanged.

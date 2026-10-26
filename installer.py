@@ -310,6 +310,12 @@ def install(args):
             print('Preflight OK. No files, factors or services were changed.');return
         before=core_fingerprint(config)
         if not before['pids']:raise RuntimeError('The configured Xray core must be running before installation')
+        core_pid=before['pids'][-1]
+        core_fields=(pathlib.Path('/proc')/str(core_pid)/'stat').read_text().rsplit(')',1)[1].split()
+        config['core_pid_hint']=core_pid
+        config['core_parent_pid_hint']=int(core_fields[1])
+        parent_command=(pathlib.Path('/proc')/core_fields[1]/'cmdline').read_bytes()
+        config['core_parent_command_hash']=hashlib.sha256(parent_command).hexdigest()
         stamp=time.strftime('%Y%m%d-%H%M%S')+'-'+secrets.token_hex(3)
         backup=args.state_dir/'backups'/stamp
         backup.mkdir(parents=True,mode=0o700)
