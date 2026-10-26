@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+generated/
+.venv/
+.env
+config.json
+*.db
+*.sqlite*
+*.pem
+*.key
+*.log
+*.tar.gz
+*.zip
+.stage-*/

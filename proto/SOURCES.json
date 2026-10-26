@@ -1,0 +1,49 @@
+{
+  "verified_utc": "2026-10-26",
+  "tested_panel": "3x-ui 3.11.0",
+  "tested_core": "Xray 26.10.21 1b1647c",
+  "files": [
+    {
+      "path": "core/config.proto",
+      "reference_url": "https://raw.githubusercontent.com/XTLS/Xray-core/1b1647c/core/config.proto",
+      "reference_sha256": "312ef0a4a9add73bbc044eab8864025fd8452ede49e7687fe75cccb17a749394",
+      "installed_sha256": "312ef0a4a9add73bbc044eab8864025fd8452ede49e7687fe75cccb17a749394",
+      "matches_reference": true
+    },
+    {
+      "path": "proxy/vless/inbound/config.proto",
+      "reference_url": "https://raw.githubusercontent.com/XTLS/Xray-core/1b1647c/proxy/vless/inbound/config.proto",
+      "reference_sha256": "42d0b5d06cf65efac92357a306a2063f530a768740692bddc00492ca026ed57f",
+      "installed_sha256": "42d0b5d06cf65efac92357a306a2063f530a768740692bddc00492ca026ed57f",
+      "matches_reference": true
+    },
+    {
+      "path": "common/protocol/user.proto",
+      "reference_url": "https://raw.githubusercontent.com/XTLS/Xray-core/1b1647c/common/protocol/user.proto",
+      "reference_sha256": "33e5c5ea3cbf330e7c526c6b0c93bc8f07a3f8b4cad579bf50698e3c544270e5",
+      "installed_sha256": "33e5c5ea3cbf330e7c526c6b0c93bc8f07a3f8b4cad579bf50698e3c544270e5",
+      "matches_reference": true
+    },
+    {
+      "path": "common/serial/typed_message.proto",
+      "reference_url": "https://raw.githubusercontent.com/XTLS/Xray-core/1b1647c/common/serial/typed_message.proto",
+      "reference_sha256": "e0d8b7fdc4557eae7c628130d909ad648e89f2f7bab68f44bdf8ddae08e1c711",
+      "installed_sha256": "e0d8b7fdc4557eae7c628130d909ad648e89f2f7bab68f44bdf8ddae08e1c711",
+      "matches_reference": true
+    },
+    {
+      "path": "app/stats/command/command.proto",
+      "reference_url": "https://raw.githubusercontent.com/XTLS/Xray-core/1b1647c/app/stats/command/command.proto",
+      "reference_sha256": "aadeb6b30e2bd13782896fa7addba101f522ea99438f9511aa4d8f1d62dcf58a",
+      "installed_sha256": "aadeb6b30e2bd13782896fa7addba101f522ea99438f9511aa4d8f1d62dcf58a",
+      "matches_reference": true
+    },
+    {
+      "path": "app/proxyman/command/command.proto",
+      "reference_url": "https://raw.githubusercontent.com/XTLS/Xray-core/1b1647c/app/proxyman/command/command.proto",
+      "reference_sha256": "4b3e4e9ad1488af54429ef6a3948fc4d527033a526280d708e389883e264e7b0",
+      "installed_sha256": "4b3e4e9ad1488af54429ef6a3948fc4d527033a526280d708e389883e264e7b0",
+      "matches_reference": true
+    }
+  ]
+}
