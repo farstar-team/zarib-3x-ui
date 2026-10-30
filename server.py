@@ -23,6 +23,7 @@ import grpc
 from accounting import Gateway, Store, make_server, STAT, PREFIX
 from app.stats.command import command_pb2 as stats
 from transport import MarkedRelay
+from license_client import LicenseClient
 
 VERSION = (ROOT/'VERSION').read_text().strip() if (ROOT/'VERSION').exists() else '1.1.0'
 
@@ -142,6 +143,9 @@ class Application:
         self.config = config
         self.store = Store(config['state_path'])
         self.panel = Panel(config)
+        self.license = LicenseClient(pathlib.Path(config['state_path']).parent / 'license.json', 'zarib',
+            str(config.get('panel_port', config.get('web_port', 2053))) + ':' + config['base_path'])
+        self.license.start()
         self.gateway = None
         self.error = ''
         self.metadata_ok_at = 0
@@ -183,7 +187,7 @@ class Application:
         rows = [dict(row, factor=row['milli']/1000) for row in self.store.rows() if row['id'] in allowed]
         return {'inbounds':rows, 'error':self.error or self.gateway.last_error,
             'metadata_ok_at':self.metadata_ok_at, 'reconciled_at':self.reconciled_at,
-            'last_rpc_at':self.gateway.last_rpc_at, 'version':VERSION}
+            'last_rpc_at':self.gateway.last_rpc_at, 'version':VERSION, 'license':self.license.status()}
 
 
 class WebHandler(http.server.BaseHTTPRequestHandler):
@@ -232,7 +236,7 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
     def do_POST(self):
         base=self.app.config['base_path']+'multipliers/'
         if not self.valid_host():return self.respond(421,{'error':'دامنه نامعتبر است'})
-        if self.path!=base+'api':return self.respond(404,{'error':'پیدا نشد'})
+        if self.path not in [base+'api',base+'api/license/activate',base+'api/license/refresh']:return self.respond(404,{'error':'پیدا نشد'})
         if self.headers.get('Origin')!=origin(self.app.config) or self.headers.get_content_type()!='application/json':
             return self.respond(403,{'error':'درخواست باید از صفحهٔ مدیریت ضریب ارسال شود'})
         try:
@@ -240,6 +244,11 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
             if not 0<length<=2048:raise ValueError('درخواست نامعتبر است')
             allowed=self.authorized()
             body=json.loads(self.rfile.read(length))
+            if self.path==base+'api/license/activate':
+                return self.respond(200,self.app.license.activate(body.get('key'),body.get('new_installation') is True))
+            if self.path==base+'api/license/refresh':
+                return self.respond(200,self.app.license.refresh())
+            self.app.license.require_management()
             inbound_id=int(body['inbound_id'])
             if inbound_id not in allowed:raise PermissionError('به این اینباند دسترسی ندارید')
             if self.app.error or time.time()-self.app.metadata_ok_at>90:

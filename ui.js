@@ -1,6 +1,6 @@
 'use strict';
 const $ = selector => document.querySelector(selector);
-const UI_VERSION = '1.1.1';
+const UI_VERSION = '1.2.0';
 const digits = value => new Intl.NumberFormat('fa-IR', {maximumFractionDigits: 3}).format(value);
 const drafts = new Map();
 let inboundRows = [];
@@ -148,6 +148,7 @@ async function load(manual = false) {
   try {
     const body = await request();
     inboundRows = body.inbounds;
+    renderLicense(body.license);
     updateMetrics(); renderRows();
     const sync = body.metadata_ok_at ? new Date(body.metadata_ok_at * 1000) : null;
     $('#sync-time').textContent = sync ? sync.toLocaleTimeString('fa-IR', {hour: '2-digit', minute: '2-digit'}) : '—';
@@ -183,3 +184,22 @@ document.querySelectorAll('.nav-item').forEach(link => link.addEventListener('cl
 document.addEventListener('keydown', event => { if (event.key === '/' && !['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) { event.preventDefault(); $('#search').focus(); } });
 calculate(); load();
 setInterval(() => { if (!document.hidden) load(); }, 30000);
+
+const LICENSE_PRODUCT="ZARIB";
+async function licenseRequest(action,body){const response=await fetch(new URL('api/license/'+action,location.href),{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const value=await response.json();if(!response.ok)throw new Error(value.error||'عملیات انجام نشد');return value;}
+const licenseNotice=toast;
+
+function renderLicense(value) {
+  const info=value||{status:'missing',can_manage:false};
+  const names={active:'فعال',missing:'فعال نشده',invalid:'نامعتبر',revoked:'متوقف شده',expired:'نیازمند تمدید'};
+  document.querySelector('#license-product').textContent=LICENSE_PRODUCT;
+  document.querySelector('#license-box').dataset.state=info.status;
+  document.querySelector('#license-status').textContent=(names[info.status]||info.status)+(info.expires_at?' · پایان: '+new Date(info.expires_at*1000).toLocaleString('fa-IR'):'')+(info.offline_grace?' · استفاده از مهلت آفلاین':'')+(info.last_error?' · '+info.last_error:'');
+}
+document.querySelector('#license-form').onsubmit=async event=>{
+  event.preventDefault();const button=event.target.querySelector('button');button.disabled=true;
+  try{const value=await licenseRequest('activate',{key:document.querySelector('#license-key').value,new_installation:document.querySelector('#license-new').checked});document.querySelector('#license-key').value='';document.querySelector('#license-new').checked=false;renderLicense(value);licenseNotice('لایسنس فعال شد.');}catch(error){licenseNotice(error.message,true);}finally{button.disabled=false;}
+};
+document.querySelector('#license-refresh').onclick=async event=>{
+  event.target.disabled=true;try{renderLicense(await licenseRequest('refresh',{}));licenseNotice('وضعیت اعتبار بررسی شد.');}catch(error){licenseNotice(error.message,true);}finally{event.target.disabled=false;}
+};

@@ -12,7 +12,7 @@ if [[ ! -d /run/systemd/system ]] || ! command -v apt-get >/dev/null; then
 fi
 
 printf '\n  ZARIB.  /  Independent inbound traffic multipliers\n\n'
-packages=(python3 python3-grpcio python3-protobuf protobuf-compiler iptables curl ca-certificates)
+packages=(python3 python3-cryptography python3-grpcio python3-protobuf protobuf-compiler iptables curl ca-certificates)
 missing=()
 for package in "${packages[@]}"; do
   if ! dpkg-query -W -f='${Status}' "$package" 2>/dev/null | grep -q '^install ok installed$'; then

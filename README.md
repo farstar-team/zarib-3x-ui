@@ -148,3 +148,8 @@ sudo python3 test_installation.py
 کد افزونه تحت [MIT](LICENSE) منتشر می‌شود. فایل‌های پروتکل Xray بدون تغییر از مرجع مشخص‌شده در [SOURCES.json](proto/SOURCES.json) آمده‌اند و مشمول [مجوز Xray](THIRD_PARTY_LICENSE_Xray-core.txt) هستند.
 
 ساخته‌شده توسط **[Farstar Team](https://github.com/farstar-team)**.
+
+
+### لایسنس و فعال‌سازی
+
+نسخهٔ رسمی از لایسنس مخصوص همین محصول در ربات FARSTAR استفاده می‌کند. فعال‌سازی و تمدید داخل رابط وب افزونه انجام می‌شود. [راهنمای مرحله‌به‌مرحله](docs/licensing.fa.md).
