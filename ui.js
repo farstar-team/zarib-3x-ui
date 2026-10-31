@@ -1,6 +1,6 @@
 'use strict';
 const $ = selector => document.querySelector(selector);
-const UI_VERSION = '1.2.0';
+const UI_VERSION = '1.2.1';
 const digits = value => new Intl.NumberFormat('fa-IR', {maximumFractionDigits: 3}).format(value);
 const drafts = new Map();
 let inboundRows = [];
@@ -194,7 +194,7 @@ function renderLicense(value) {
   const names={active:'فعال',missing:'فعال نشده',invalid:'نامعتبر',revoked:'متوقف شده',expired:'نیازمند تمدید'};
   document.querySelector('#license-product').textContent=LICENSE_PRODUCT;
   document.querySelector('#license-box').dataset.state=info.status;
-  document.querySelector('#license-status').textContent=(names[info.status]||info.status)+(info.expires_at?' · پایان: '+new Date(info.expires_at*1000).toLocaleString('fa-IR'):'')+(info.offline_grace?' · استفاده از مهلت آفلاین':'')+(info.last_error?' · '+info.last_error:'');
+  document.querySelector('#license-status').textContent=(names[info.status]||info.status)+(info.permanent?' · دائمی':info.expires_at?' · پایان: '+new Date(info.expires_at*1000).toLocaleString('fa-IR'):'')+(info.offline_grace?' · استفاده از مهلت آفلاین':'')+(info.last_error?' · '+info.last_error:'');
 }
 document.querySelector('#license-form').onsubmit=async event=>{
   event.preventDefault();const button=event.target.querySelector('button');button.disabled=true;

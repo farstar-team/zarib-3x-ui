@@ -131,7 +131,7 @@ class LicenseClient:
                 state = payload['status']
                 if state == 'active' and stamp > min(payload['grace_until'], payload['expires_at']):
                     state = 'expired'
-                result.update(status=state, can_manage=valid, expires_at=payload['expires_at'],
+                result.update(status=state, can_manage=valid, permanent=bool(payload.get('permanent')), expires_at=None if payload.get('permanent') else payload['expires_at'],
                     license_id=payload['license_id'], lease_until=payload['lease_until'],
                     grace_until=payload['grace_until'], offline_grace=valid and stamp > payload['lease_until'])
             except (LicenseError, KeyError, TypeError, ValueError):
