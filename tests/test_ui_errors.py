@@ -4,7 +4,7 @@ from ui_errors import response_error
 
 class ErrorTests(unittest.TestCase):
     def test_all_errors_have_safe_actionable_details_and_tracking_id(self):
-        cases=[(401,'ابتدا وارد Atlas شوید.','login_required'),(401,'رمز ورود صحیح نیست.','login_failed'),
+        cases=[(401,'ابتدا با همان نام کاربری و رمز ثنایی وارد شوید.','login_required'),(401,'ابتدا وارد Atlas شوید.','login_required'),(401,'رمز ورود صحیح نیست.','login_failed'),
             (403,'مبدأ درخواست معتبر نیست.','origin_mismatch'),(403,'درخواست منقضی شد؛ صفحه را تازه کنید.','csrf_expired'),
             (421,'آدرس میزبان مجاز نیست.','host_not_allowed'),(429,'تلاش زیاد؛ پنج دقیقه دیگر امتحان کنید.','rate_limited'),
             (400,'پورت ورودی باید آزاد باشد.','port_unavailable'),(400,'آدرس SOCKS معتبر نیست.','proxy_invalid'),
