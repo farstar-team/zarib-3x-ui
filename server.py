@@ -24,6 +24,7 @@ from accounting import Gateway, Store, make_server, STAT, PREFIX
 from app.stats.command import command_pb2 as stats
 from transport import MarkedRelay
 from license_client import LicenseClient
+from ui_errors import response_error
 
 VERSION = (ROOT/'VERSION').read_text().strip() if (ROOT/'VERSION').exists() else '1.1.0'
 
@@ -198,6 +199,8 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
     def app(self):return self.server.application
 
     def respond(self, status, body, content_type='application/json; charset=utf-8'):
+        if status>=400 and isinstance(body,dict) and 'error' in body and not body.get('error_code'):
+            body={**body,**response_error(body['error'],status,self.path)}
         if isinstance(body,dict):body=json.dumps(body,ensure_ascii=False).encode()
         elif isinstance(body,str):body=body.encode()
         self.send_response(status)
@@ -221,9 +224,9 @@ class WebHandler(http.server.BaseHTTPRequestHandler):
         base=self.app.config['base_path']+'multipliers/'
         if not self.valid_host():return self.respond(421,{'error':'از دامنهٔ پنل استفاده کنید'})
         path=urllib.parse.urlsplit(self.path).path
-        if path in [base,base+'index.html',base+'ui.js',base+'ui.css']:
-            filename={base:'index.html',base+'index.html':'index.html',base+'ui.js':'ui.js',base+'ui.css':'ui.css'}[path]
-            kind={'index.html':'text/html; charset=utf-8','ui.js':'text/javascript; charset=utf-8','ui.css':'text/css; charset=utf-8'}[filename]
+        if path in [base,base+'index.html',base+'ui.js',base+'ui.css',base+'ui-feedback.js']:
+            filename={base:'index.html',base+'index.html':'index.html',base+'ui.js':'ui.js',base+'ui.css':'ui.css',base+'ui-feedback.js':'ui-feedback.js'}[path]
+            kind={'index.html':'text/html; charset=utf-8','ui.js':'text/javascript; charset=utf-8','ui-feedback.js':'text/javascript; charset=utf-8','ui.css':'text/css; charset=utf-8'}[filename]
             return self.respond(200,(ROOT/filename).read_bytes(),kind)
         if path != base+'api':return self.respond(404,{'error':'پیدا نشد'})
         try:

@@ -23,7 +23,7 @@ import time
 import urllib.parse
 
 SOURCE=pathlib.Path(__file__).resolve().parent
-RUNTIME=['license_client.py','accounting.py','server.py','transport.py','redirect.py','index.html','ui.css','ui.js','VERSION']
+RUNTIME=['ui_errors.py','ui-feedback.js','license_client.py','accounting.py','server.py','transport.py','redirect.py','index.html','ui.css','ui.js','VERSION']
 SETTINGS=('webPort','webBasePath','webCertFile','webKeyFile','webDomain','webListen')
 
 
